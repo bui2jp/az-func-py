@@ -6,6 +6,20 @@ import json
 
 myApp = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
+@myApp.route(route="check/orchestrators")
+@myApp.durable_client_input(client_name="client")
+async def check_orchestrator(req: func.HttpRequest, client):
+    instances = await client.get_status_all()
+    for instance in instances:
+        # logging.info(instance.to_json())
+        instance_dict = instance.to_json()
+        
+        # logging.info((type(instance_dict)))        
+        if instance_dict["runtimeStatus"] != "Completed":
+            logging.info(f'name: {instance_dict["name"]} instanceId : {instance_dict["instanceId"]} runtimeStatus: {instance_dict["runtimeStatus"]} lastUpdatedTime: {instance_dict["lastUpdatedTime"]}')
+            
+    return ""
+
 # An HTTP-Triggered Function with a Durable Functions Client binding
 @myApp.route(route="orchestrators/{functionName}")
 @myApp.durable_client_input(client_name="client")
@@ -14,14 +28,21 @@ async def http_start(req: func.HttpRequest, client):
 
     # 'functionName' がすでに動いているかどうかを確認する
     instances = await client.get_status_all()
+    running = False
     for instance in instances:
         # logging.info(instance.to_json())
         instance_dict = instance.to_json()
         
-        # logging.info((type(instance_dict)))
+        # logging.info((type(instance_dict)))        
         if instance_dict["runtimeStatus"] != "Completed":
-            logging.info(f'name: {instance_dict["name"]} instanceId : {instance_dict["instanceId"]} runtimeStatus: {instance_dict["runtimeStatus"]} lastUpdatedTime: {instance_dict["lastUpdatedTime"]}')
+            logging.info(f'name: {instance_dict["name"]} instanceId : {instance_dict["instanceId"]} runtimeStatus: {instance_dict["runtimeStatus"]} lastUpdatedTime: {instance_dict["lastUpdatedTime"]}')            
             # logging.log(json.dumps(instance))
+            # 動作中の場合はここでErrorにできる
+            running = True
+            # raise Exception('すでに実行中の場合 500')
+    if running:
+        raise Exception('すでに実行中の場合 500')
+
 
     # Orchestrator関数の開始
     instance_id = await client.start_new(function_name)
@@ -74,7 +95,7 @@ def hello_orchestrator2(context):
 @myApp.activity_trigger(input_name="city")
 def hello2(city: str):
     # 時間のかかる処理
-    for i in range(100):
+    for i in range(5):
         logging.info(f" hello sleep. city: {city}")
         time.sleep(1) #10秒
     
