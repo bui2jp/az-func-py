@@ -78,8 +78,17 @@ eastus2euap
 westus3
 swedencentral
 
-# function (--flexconsumption-location)
+# 通常の従量課金 (--consumption-plan-location)
+az functionapp create --resource-group $RG_NAME --consumption-plan-location $REGION --runtime python --runtime-version 3.11 --functions-version 4 --name $FUNC_NAME --os-type linux --storage-account $STORAGE_NAME
+
+# Flex 従量課金 (--flexconsumption-location)
 az functionapp create --resource-group $RG_NAME --flexconsumption-location $REGION --runtime python --runtime-version 3.11 --functions-version 4 --name $FUNC_NAME --os-type linux --storage-account $STORAGE_NAME
+```
+
+※ Flex 従量課金だと durable(python) が Azure にデプロイ後に以下のエラーになるので 通常の従量課金プランで実施
+
+```
+The following constructors are ambiguous: Void .ctor(Microsoft.Extensions.Options.IOptions`1[Microsoft.Azure.WebJobs.Extensions.DurableTask.DurableTaskOptions], Microsoft.Extensions.Logging.ILoggerFactory, Microsoft.Azure.WebJobs.Host.Executors.IHostIdProvider, Microsoft.Azure.WebJobs.INameResolver, System.IServiceProvider, DurableTask.Netherite.ConnectionResolver, Microsoft.Azure.WebJobs.Extensions.DurableTask.IPlatformInformation) Void .ctor(Microsoft.Extensions.Options.IOptions`1[Microsoft.Azure.WebJobs.Extensions.DurableTask.DurableTaskOptions], Microsoft.Extensions.Logging.ILoggerFactory, Microsoft.Azure.WebJobs.Extensions.DurableTask.IConnectionStringResolver, Microsoft.Azure.WebJobs.Host.Executors.IHostIdProvider, Microsoft.Azure.WebJobs.INameResolver, Microsoft.Azure.WebJobs.Extensions.DurableTask.IPlatformInformation).
 ```
 
 ## v2 プログラミング モデルを有効にする
@@ -126,3 +135,8 @@ func start
 ```
 func azure functionapp publish $FUNC_NAME
 ```
+
+# プログラミングモデルの v1 と v2
+
+- v2 では トリガーとバインディングを デコレーターで指定する (function.json が不要になった)
+- 関数のエントリーポイントが _init_.py から function_app.py に変更
