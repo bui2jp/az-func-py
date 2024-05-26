@@ -140,3 +140,10 @@ func azure functionapp publish $FUNC_NAME
 
 - v2 では トリガーとバインディングを デコレーターで指定する (function.json が不要になった)
 - 関数のエントリーポイントが _init_.py から function_app.py に変更
+
+## すべてのステータスを取得することも可能
+
+```
+# 'functionName' がすでに動いているかどうかを確認する
+    instances = await client.get_status_all()
+```

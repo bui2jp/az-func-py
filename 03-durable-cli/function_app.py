@@ -2,6 +2,7 @@ import azure.functions as func
 import azure.durable_functions as df
 import time
 import logging
+import json
 
 myApp = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -10,6 +11,18 @@ myApp = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 @myApp.durable_client_input(client_name="client")
 async def http_start(req: func.HttpRequest, client):
     function_name = req.route_params.get('functionName')
+
+    # 'functionName' がすでに動いているかどうかを確認する
+    instances = await client.get_status_all()
+    for instance in instances:
+        # logging.info(instance.to_json())
+        instance_dict = instance.to_json()
+        
+        # logging.info((type(instance_dict)))
+        if instance_dict["runtimeStatus"] != "Completed":
+            logging.info(f'name: {instance_dict["name"]} instanceId : {instance_dict["instanceId"]} runtimeStatus: {instance_dict["runtimeStatus"]} lastUpdatedTime: {instance_dict["lastUpdatedTime"]}')
+            # logging.log(json.dumps(instance))
+
     # Orchestrator関数の開始
     instance_id = await client.start_new(function_name)
     response = client.create_check_status_response(req, instance_id)
