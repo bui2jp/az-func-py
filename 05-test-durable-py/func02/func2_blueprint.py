@@ -13,7 +13,8 @@ bp = df.Blueprint()
 def log_thread_info(function_name, dummy=None):
     hostname = socket.gethostname()
     thread_id = threading.get_ident()
-    logging.info(f"{function_name} start, hostname: {hostname}, thread ID: {thread_id}")
+    process_id = os.getpid()
+    logging.info(f"{function_name} start, hostname: {hostname}, process:id {process_id} thread ID: {thread_id}")
 
 
 # An HTTP-Triggered Function with a Durable Functions Client binding
@@ -38,13 +39,20 @@ def hello_o2(context):
     all_work_batch = yield context.call_activity("F1", taskCount)
     # logging.info(f"all_work_batch: {all_work_batch}")
 
+    # chunkSizeに分割
+    chunk_size = 10
+    split_work_batches = np.array_split(all_work_batch, chunk_size)
+    logging.info(f"split_work_batches: {split_work_batches}")
+
     # F2
+    parallel_size = 5
     parallel_tasks = []
     # n分割してActivityを呼び出す
     split_work_batches = np.array_split(all_work_batch, len(all_work_batch) // 10)
     for works in split_work_batches:
         parallel_tasks.append(context.call_activity("F2", works.tolist()))
-    # logging.info(f"parallel_tasks: {parallel_tasks}")
+
+    logging.info(f"len of parallel_tasks : {len(parallel_tasks)}")
     outputs = yield context.task_all(parallel_tasks)
 
     # F3
