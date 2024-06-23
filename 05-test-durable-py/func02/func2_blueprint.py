@@ -10,11 +10,14 @@ import os
 bp = df.Blueprint()
 
 
-def log_thread_info(function_name, dummy=None):
+def log_thread_info(function_name):
     hostname = socket.gethostname()
     thread_id = threading.get_ident()
     process_id = os.getpid()
-    logging.info(f"{function_name} start, hostname: {hostname}, process:id {process_id} thread ID: {thread_id}")
+    
+    message = f"{function_name}, hostname: {hostname}, process:id {process_id} thread ID: {thread_id}"
+    logging.info(message)
+    return message
 
 
 # An HTTP-Triggered Function with a Durable Functions Client binding
@@ -22,10 +25,25 @@ def log_thread_info(function_name, dummy=None):
 @bp.durable_client_input(client_name="client")
 async def http_start2(req: func.HttpRequest, client):
     function_name = req.route_params.get('functionName')
-    taskCount = int(req.params.get('taskCount', '100'))
-    log_thread_info(f"http_start2: taskCount {taskCount}")
-    instance_id = await client.start_new(function_name, None, taskCount)
-    response = client.create_check_status_response(req, instance_id)
+    
+    # シングルトンで動かす
+    instance_id = req.params.get('myId', 'my-id-2024001')
+    log_thread_info(f"http_start2: instance_id {instance_id}")
+    existing_instance = await client.get_status(instance_id)
+    if existing_instance.runtime_status in [df.OrchestrationRuntimeStatus.Completed, df.OrchestrationRuntimeStatus.Failed, df.OrchestrationRuntimeStatus.Terminated, None]:
+        taskCount = int(req.params.get('taskCount', '100'))
+        log_thread_info(f"http_start2: taskCount {taskCount}")
+        instance_id = await client.start_new(function_name, instance_id, taskCount)
+        response = client.create_check_status_response(req, instance_id)
+    else:
+        log_thread_info(f"An instance with ID '${existing_instance.instance_id}' already exists")
+        response = client.create_check_status_response(req, instance_id)
+        # return {
+        #     'status': 409,
+        #     'body': f"An instance with ID '${existing_instance.instance_id}' already exists"
+        # }
+
+
     return response
 
 
@@ -73,14 +91,30 @@ def F1(taskCount=None):
 # Activity
 @bp.activity_trigger(input_name="input")
 def F2(input):
+    outputs = []
     # 時間のかかる処理
     for i in input:
-        log_thread_info(f"F2 input: {i}")
         # logging.info(f"input: {i}")
-        time.sleep(1)
+        output = log_thread_info(f"F2 input: {i} start")
+        # time.sleep(1)
+        # 疑似的な時間のかかる処理
+        generate_primes(100000)
 
-    # logging.info("F2 end")
-    return input
+        output = log_thread_info(f"F2 input: {i} end")
+        outputs.append(output)
+
+    logging.info(outputs)
+    return outputs
+
+def generate_primes(limit):
+    primes = []
+    for i in range(2, limit):
+        for j in range(2, int(i**0.5) + 1):
+            if i % j == 0:
+                break
+        else:
+            primes.append(i)
+    return primes
 
 
 # Activity
