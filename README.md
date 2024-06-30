@@ -42,9 +42,13 @@ func --version
 
 ```
 export RG_NAME=rg-py-func-test
-export STORAGE_NAME=st2024pyfunc0001
 export REGION=japaneast
+
+export STORAGE_NAME=st2024pyfunc0001
+export STORAGE_NAME2=st2024pyfunc0002
 export FUNC_NAME=func-durable-py202406
+export FUNC_NAME2=func-durable-py20240602
+export APP_SRV_PLAN_NAME=appsrv-plan-linux-py202406
 ```
 
 # Azure CLI (azure function)
@@ -89,6 +93,22 @@ az resource update --resource-type Microsoft.Web/sites -g $RG_NAME -n $FUNC_NAME
 # az functionapp create --resource-group $RG_NAME --flexconsumption-location $REGION --runtime python --runtime-version 3.11 --functions-version 4 --name $FUNC_NAME --os-type linux --storage-account $STORAGE_NAME
 ```
 
+app service plan
+
+```
+az storage account create --name $STORAGE_NAME2 --location $REGION --resource-group $RG_NAME --sku Standard_LRS
+
+az functionapp plan create --name $APP_SRV_PLAN_NAME --resource-group $RG_NAME --location $REGION --sku B1 --is-linux
+
+az functionapp create --name $FUNC_NAME2 --storage-account $STORAGE_NAME2 --plan $APP_SRV_PLAN_NAME --resource-group $RG_NAME --runtime python --runtime-version 3.10 --functions-version 4
+
+```
+
+```
+az webapp log tail --resource-group $RG_NAME --name $FUNC_NAME2
+az webapp log download --name $FUNC_NAME2 --resource-group $RG_NAME
+```
+
 v2 プログラミング モデルを有効
 
 ```
@@ -103,17 +123,18 @@ az functionapp config appsettings set --name $FUNC_NAME --resource-group $RG_NAM
 ## ACR
 
 ```
-export ACR_NAME=acr202405funcapp001
+export ACR_NAME=acr202406funcapp001
 export IMAGE_NAME=durable-func-py
+export IMAGE_VER=v2024063001
 
 az acr create -n $ACR_NAME -g $RG_NAME --sku Basic
 az acr login --name $ACR_NAME
 
 # build
-docker build --tag $ACR_NAME.azurecr.io/$IMAGE_NAME:v1.0.0 .
+docker build --tag $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_VER .
 
 # push
-docker push ${ACR_NAME}.azurecr.io/$IMAGE_NAME:latest
+docker push ${ACR_NAME}.azurecr.io/$IMAGE_NAME:$IMAGE_VER
 ```
 
 ## Container Apps
@@ -129,7 +150,7 @@ az provider register --namespace Microsoft.OperationalInsights
 環境作成
 
 ```
-export CONTAINERAPPS_ENVIRONMENT=aca-py-function-2024-05
+export CONTAINERAPPS_ENVIRONMENT=aca-py-function-2024-07
 az containerapp env create \
   --name $CONTAINERAPPS_ENVIRONMENT \
   --resource-group $RG_NAME \
@@ -143,7 +164,7 @@ az containerapp env create \
 ※ システム割り当てマネージド ID を利用します。
 
 ```
-export CONTAITER_APP_NAME=my-first-container-app
+export CONTAITER_APP_NAME=aca-my-first-container-app
 az containerapp create --name $CONTAITER_APP_NAME --resource-group $RG_NAME --environment $CONTAINERAPPS_ENVIRONMENT --image mcr.microsoft.com/k8se/quickstart:latest --target-port 80 --ingress 'external' --query properties.configuration.ingress.fqdn
 ```
 
@@ -161,7 +182,7 @@ az containerapp registry set \
 ※コンテナイメージを作りなおしてデプロイする
 
 ```
-az containerapp update --name $CONTAITER_APP_NAME --resource-group $RG_NAME --image $ACR_NAME.azurecr.io/$IMAGE_NAME:latest
+az containerapp update --name $CONTAITER_APP_NAME --resource-group $RG_NAME --image $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_VER
 ```
 
 https://my-1st-container-app.purpleisland-1252aa69.japaneast.azurecontainerapps.io/api/orchestrators/hello_orchestrator2
@@ -170,11 +191,22 @@ https://my-1st-container-app.purpleisland-1252aa69.japaneast.azurecontainerapps.
 
 ```
 az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
-  --set-env-vars WEBSITE_HOSTNAME=localhost:80 \
-  --set-env-vars AzureWebJobsStorage=<ここはシークレットを利用する>
+  --set-env-vars WEBSITE_HOSTNAME=localhost:80
 ```
 
-WEBSITE_HOSTNAME=localhost:80
+```
+export STORAGE_NAME2_CONNECT_STRING="DefaultEndpointsProtocol=https; xxx "
+
+az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
+  --set-env-vars AzureWebJobsStorage=$STORAGE_NAME2_CONNECT_STRING
+```
+
+関数呼んでみる
+
+```
+api/orchestrators2/{functionName}
+curl -i https://aca-my-first-container-app.kindpebble-2073c725.japaneast.azurecontainerapps.io/api/orchestrators2/hello_o2
+```
 
 # az function (ここからはプログラミング)
 
@@ -215,18 +247,18 @@ build
 
 ```
 # build
-docker build --tag $ACR_NAME.azurecr.io/$IMAGE_NAME:v1.0.0 .
+docker build --tag $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_VER .
 
 ※ dnsエラーの場合
-docker build --network host --tag $ACR_NAME.azurecr.io/$IMAGE_NAME:v1.0.0 .
+docker build --network host --tag $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_VER .
 ```
 
 ```
 docker run -p 8080:80 \
   -e AzureWebJobsFeatureFlags=EnableWorkerIndexing \
-  -e AzureWebJobsStorage=$AzureWebJobsStorage \
+  -e AzureWebJobsStorage=$STORAGE_NAME2_CONNECT_STRING \
   -e WEBSITE_HOSTNAME=localhost:8080 \
-  -it $ACR_NAME.azurecr.io/$IMAGE_NAME:v1.0.0
+  -it $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_VER
 ```
 
 ※ ACA へデプロイする場合は WEBSITE_HOSTNAME=localhost:80
@@ -237,6 +269,7 @@ https://blog.shibayan.jp/entry/20220503/1651510570
 
 ```
 func azure functionapp publish $FUNC_NAME
+func azure functionapp publish $FUNC_NAME2
 ```
 
 # プログラミングモデルの v1 と v2
