@@ -15,8 +15,8 @@
   "extensions": {
     "durableTask": {
       "hubName": "MyTaskHub01",
-      "maxConcurrentActivityFunctions": 2,
-      "maxConcurrentOrchestratorFunctions": 2
+      "maxConcurrentActivityFunctions": 1,
+      "maxConcurrentOrchestratorFunctions": 1
     }
   }
 }

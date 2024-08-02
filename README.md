@@ -125,7 +125,7 @@ az functionapp config appsettings set --name $FUNC_NAME --resource-group $RG_NAM
 ```
 export ACR_NAME=acr202406funcapp001
 export IMAGE_NAME=durable-func-py
-export IMAGE_VER=v2024063001
+export IMAGE_VER=v2024070714
 
 az acr create -n $ACR_NAME -g $RG_NAME --sku Basic
 az acr login --name $ACR_NAME
@@ -185,7 +185,7 @@ az containerapp registry set \
 az containerapp update --name $CONTAITER_APP_NAME --resource-group $RG_NAME --image $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_VER
 ```
 
-https://my-1st-container-app.purpleisland-1252aa69.japaneast.azurecontainerapps.io/api/orchestrators/hello_orchestrator2
+curl -i https://aca-my-first-container-app.kindpebble-2073c725.japaneast.azurecontainerapps.io/api/orchestrators2/hello_o2?myId=my-id-20240714-r2-01
 
 環境変数の設定
 
@@ -195,7 +195,7 @@ az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
 ```
 
 ```
-export STORAGE_NAME2_CONNECT_STRING="DefaultEndpointsProtocol=https; xxx "
+export STORAGE_NAME2_CONNECT_STRING="DefaultEndpointsProtocol=https;xxxx"
 
 az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
   --set-env-vars AzureWebJobsStorage=$STORAGE_NAME2_CONNECT_STRING
@@ -206,6 +206,55 @@ az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
 ```
 api/orchestrators2/{functionName}
 curl -i https://aca-my-first-container-app.kindpebble-2073c725.japaneast.azurecontainerapps.io/api/orchestrators2/hello_o2
+```
+
+## スケーリングの設定
+
+queue
+
+```
+mytaskhub01-workitems
+
+mytaskhub01-control-01
+mytaskhub01-control-02
+mytaskhub01-control-03
+```
+
+replica 数の確認
+
+```
+REVISION_NAME=aca-my-first-container-app--nrw6r7y
+
+az containerapp revision show --revision $REVISION_NAME -n $CONTAITER_APP_NAME -g $RG_NAME -o table
+```
+
+azure storage queue トリガーの設定
+
+```
+CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=xxxxx
+QUEUE_NAME=mytaskhub01-workitems
+QUEUE_NAME0=mytaskhub01-control-00
+QUEUE_NAME1=mytaskhub01-control-01
+QUEUE_NAME2=mytaskhub01-control-02
+QUEUE_NAME3=mytaskhub01-control-03
+
+az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
+--scale-rule-name my-rule-workitem \
+--scale-rule-type azure-queue \
+--scale-rule-metadata connectionFromEnv=$CONNECTION_STRING queueName=$QUEUE_NAME
+
+
+az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
+--scale-rule-name my-rule00 \
+--scale-rule-type azure-queue \
+--scale-rule-metadata connectionFromEnv=$CONNECTION_STRING queueName=$QUEUE_NAME0
+
+
+az containerapp update -n $CONTAITER_APP_NAME -g $RG_NAME \
+--scale-rule-name my-rule02 \
+--scale-rule-type azure-queue \
+--scale-rule-metadata connectionFromEnv=$CONNECTION_STRING queueName=$QUEUE_NAME1
+
 ```
 
 # az function (ここからはプログラミング)
@@ -299,4 +348,10 @@ host.json
      "maxConcurrentOrchestratorFunctions": 2
    }
  }
+```
+
+ACA
+
+```
+az containerapp update -n myapp -g mygroup --scale-rule-name my-custom-rule --scale-rule-type my-custom-type --scale-rule-metadata key=value key2=value2 --scale-rule-auth triggerparam=secretref triggerparam=secretref
 ```

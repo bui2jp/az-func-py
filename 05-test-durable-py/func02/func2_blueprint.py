@@ -66,7 +66,7 @@ def hello_o2(context):
     parallel_size = 5
     parallel_tasks = []
     # n分割してActivityを呼び出す
-    split_work_batches = np.array_split(all_work_batch, len(all_work_batch) // 10)
+    split_work_batches = np.array_split(all_work_batch, len(all_work_batch) // 5)
     for works in split_work_batches:
         parallel_tasks.append(context.call_activity("F2", works.tolist()))
 
@@ -100,7 +100,7 @@ def F2(input):
         # 疑似的な時間のかかる処理
         generate_primes(100000)
 
-        output = log_thread_info(f"F2 input: {i} end")
+        # output = log_thread_info(f"F2 input: {i} end")
         outputs.append(output)
 
     logging.info(outputs)
